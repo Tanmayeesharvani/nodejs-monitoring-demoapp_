@@ -179,5 +179,5 @@ For a cafe_static, php_book_album(Any simple LAMP stack application)
   *Kubernetes --> Triggers --> Select build after other projects are built--> select docker
    Build steps --> Deploy to kubernetes --> Select kubeconfig --> Give .yaml(service and deployment) file names in config
    
-
+Amrutha-vm0407
 
