@@ -1,0 +1,183 @@
+Tagging an image and pushing it to my hub ---> commands for this
+Requirements files
+
+1.Java ---> pom.xml(war or jar specified in this)
+2.Python ---> Requirements.txt 
+3.Nodejs ---> package.json
+
+Jenkins and Tomcat port changes(if any)
+/opt/tomcat/conf/server.xml ---> <Connector port="8080" ... />
+/etc/default/jenkins ---> HTTP_PORT=8080
+
+Inside container → Apache listens on 80
+Service targetPort → 80
+Service port → 80
+NodePort → e.g. 31000
+All correct.
+
+Package managers
+
+1.Java ---> maven or gradle
+2.Python ---> pip or conda
+3.Nodejs ---> npm/nvm
+
+Jenkins use cases: Maven application and JSP application
+
+Maven application
+
+Create 4 different freestyle jenkins project.
+In the configure, We are using git as Source Code Management by providing repo url. Specify the branch (master or main) where the source code lies.
+The above steps are common for all the projects.
+Maven is a build automation and project management tool primarily for Java projects.
+
+1.Java_compile
+Build steps:In the build steps, select invoke top level maven targets. Use the tool maven(plugin priorly downloaded).
+Goals: clean validate compile
+
+
+2.Java_codeReview
+Triggers:
+To achieve the CI/CD pipeline, enable build after another projects are built. Select the project after which you want to trigger this project. In this we need to trigger it after Java_compile build is stable.
+Build Steps:
+Goals: -P metrics pmd:pmd checkstyle:checkstyle findbugs:findbugs
+Post-buils actions:
+Record compiler warnings and static analysis results using the tools
+*PMD (A source code analyzer for Java and other languages)
+*CheckStyle (A tool to check Java source code for adherence to coding standards)
+*FindBugs (A static analysis tool for Java bytecode to find potential bugs)
+
+
+3.Java_testcases
+Triggers:
+To achieve the CI/CD pipeline, enable build after another projects are built. Select the project after which you want to trigger this project. In this we need to trigger it after Java_codeReview build is stable.
+Build steps:In the build steps, select invoke top level maven targets. Use the tool maven(plugin priorly downloaded).
+Goals: test
+Post-buils Steps:
+Publish JUnit test result report
+Specify the test report XMLs path --> target/surefire-reports/*.xml
+
+
+4.Java_deploy
+Triggers:
+To achieve the CI/CD pipeline, enable build after another projects are built. Select the project after which you want to trigger this project. In this we need to trigger it after Java_testcases build is stable.
+Build steps: In the build steps, select invoke top level maven targets. Use the tool maven(plugin priorly downloaded).
+Goals: package
+
+The above steps are for baremetal
+
+5.Java_docker
+Docker--->Triggers --> Select build after other projects are built--> select last baremetal project
+   Build steps -->1.Execute shell --> give below two commannds
+     sudo docker build . -f Dockerfile -t mavenapp:v1
+     sudo docker run --name mavenapp -d -p 100:8080 mavenapp:v1
+   Build steps -->2.Docker build and publish --->Give Repository name--> gaganahs/your_repo_name --> Tag v1 --> Registry creds
+   (select docker creds)
+
+6.Java K8
+   Kubernetes --> Triggers --> Select build after other projects are built--> select docker
+   Build steps --> Deploy to kubernetes --> Select kubeconfig --> Give .yaml(service and deployment) file names in config
+
+
+JSP application
+
+Create 3 different freestyle jenkins project.
+In the configure, We are using git as Source Code Management by providing repo url. Specify the branch (master or main) where the source code lies.
+The above steps are common for all the projects.
+JSP stands for JavaServer Pages. It’s a server-side technology used to create dynamic web pages using Java.
+
+
+1.Java_jsp_compile
+Build steps:In the build steps, select invoke top level maven targets. Use the tool maven(plugin priorly downloaded).
+Goals: clean validate compile
+
+
+2.Java_jsp_codereview
+Build Steps:
+Goals: -P metrics pmd:pmd checkstyle:checkstyle findbugs:findbugs
+Post-buils actions:
+Record compiler warnings and static analysis results using the tools
+*PMD (A source code analyzer for Java and other languages)
+*CheckStyle (A tool to check Java source code for adherence to coding standards)
+*FindBugs (A static analysis tool for Java bytecode to find potential bugs)
+
+
+3.Java_jsp_packagedeploy
+Build steps: In the build steps, select invoke top level maven targets. Use the tool maven(plugin priorly downloaded).
+Goals: package
+Post-build-actions:
+Select Deploy war/ear to a container 
+*Search for the war file (**/*.war)
+*Deploy to Container Plugin is installed
+*Store tomcat creds in jenkins credentials
+*Set the Manager URL (Eg: http://172.18.181.65:8081) port number can be changed in server.xml file of tomcat.
+
+
+If the above use cases are to be done in Master-slave architecture of jenkins, in the general configuration use Restrict where this project can be run and specify the slave node.
+
+
+Nodejs application
+
+Create freestyle jenkins project.
+In the configure, We are using git as Source Code Management by providing repo url. Specify the branch (master or main) where the source code lies.
+The above steps are common for all the projects.
+
+nodejs_baremetal project works as dev or testing env and nodejs_docker_deploy works as production env where our code is deployed in docker container.
+
+1.nodejs_baremetal_deploy
+Build steps: Select Execute shell and provide the following commands
+sudo apt-get install nodejs npm -y
+sudo make lint
+sudo make lint-fix
+sudo make test
+sudo make test-report
+
+Post-build-actions:Trigger parameterized build on other projects
+Provide the name of the project to be build after this (Projects to build). nodejs_docker_deploy to be triggered in this case.
+
+
+2.nodejs_docker_deploy
+In the general configuration use Restrict where this project can be run and specify the slave node.
+Build steps: Select Execute shell and provide the following commands
+sudo docker build . -f build/Dockerfile -t nodeapp:v1
+sudo docker run --name nodeapp -d -p 85:80 nodeapp:v1
+
+3.nodejs_k8
+Kubernetes --> Triggers --> Select build after other projects are built--> select docker
+   Build steps --> Deploy to kubernetes --> Select kubeconfig --> Give .yaml(service and deployment) file names in config
+
+
+Python monitoring application
+
+All the steps are same as nodejs application. Use python monitor code from git.
+
+
+Cafe_docker application
+
+Build steps: 
+*Select Docker Build and Publish
+Give repository name and registry creds.
+
+*Execute Docker command 
+ Docker command: Select Create container
+ Specify Image name
+
+*Execute Docker command 
+ Docker command:Start container(s)
+ Give container name
+ 
+
+For a cafe_static, php_book_album(Any simple LAMP stack application)
+
+  *Baremetal---> Shell script
+  Note: Remember to keep 000-default.conf in case of php website as shell script needs it. 
+  *Docker--->Triggers --> Select build after other projects are built--> select baremetal
+   Build steps -->1.Execute shell --> give below two commannds
+     sudo docker build . -f Dockerfile -t phpapp:v1
+     sudo docker run --name phpapp -d -p 100:80 phpapp:v1
+   Build steps -->2.Docker build and publish --->Give Repository name--> gaganahs/your_repo_name --> Tag v1 --> Registry creds
+   (select docker creds)
+  *Kubernetes --> Triggers --> Select build after other projects are built--> select docker
+   Build steps --> Deploy to kubernetes --> Select kubeconfig --> Give .yaml(service and deployment) file names in config
+   
+
+
